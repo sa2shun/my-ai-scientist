@@ -13,6 +13,7 @@ MAX_NUM_TOKENS = 4096
 AVAILABLE_LLMS = [
     "claude-3-5-sonnet-20240620",
     "claude-3-5-sonnet-20241022",
+    "claude-opus-4-20250514",
     # OpenAI models
     "gpt-4o-mini",
     "gpt-4o-mini-2024-07-18",
@@ -41,12 +42,14 @@ AVAILABLE_LLMS = [
     "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
     "bedrock/anthropic.claude-3-haiku-20240307-v1:0",
     "bedrock/anthropic.claude-3-opus-20240229-v1:0",
+    "bedrock/anthropic.claude-opus-4-20250514-v1:0",
     # Anthropic Claude models Vertex AI
     "vertex_ai/claude-3-opus@20240229",
     "vertex_ai/claude-3-5-sonnet@20240620",
     "vertex_ai/claude-3-5-sonnet@20241022",
     "vertex_ai/claude-3-sonnet@20240229",
     "vertex_ai/claude-3-haiku@20240307",
+    "vertex_ai/claude-opus-4@20250514",
     # Google Gemini models
     "gemini-2.0-flash",
     "gemini-2.5-flash-preview-04-17",
