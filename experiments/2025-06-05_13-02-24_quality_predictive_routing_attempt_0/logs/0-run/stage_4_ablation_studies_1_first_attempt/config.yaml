@@ -1,0 +1,89 @@
+data_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- sasaki
+- my-ai-scientist
+- experiments
+- 2025-06-05_13-02-24_quality_predictive_routing_attempt_0
+- data
+desc_file: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- sasaki
+- my-ai-scientist
+- experiments
+- 2025-06-05_13-02-24_quality_predictive_routing_attempt_0
+- idea.json
+goal: null
+eval: null
+log_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- sasaki
+- my-ai-scientist
+- experiments
+- 2025-06-05_13-02-24_quality_predictive_routing_attempt_0
+- logs
+- 0-run
+workspace_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- sasaki
+- my-ai-scientist
+- experiments
+- 2025-06-05_13-02-24_quality_predictive_routing_attempt_0
+- 0-run
+preprocess_data: false
+copy_data: true
+exp_name: 0-run
+exec:
+  timeout: 3600
+  agent_file_name: runfile.py
+  format_tb_ipython: false
+generate_report: true
+report:
+  model: gpt-4o-mini
+  temp: 0.7
+  thinking: ???
+  betas: ???
+  max_tokens: null
+agent:
+  steps: 3
+  stages:
+    stage1_max_iters: 8
+    stage2_max_iters: 6
+    stage3_max_iters: 6
+    stage4_max_iters: 8
+  k_fold_validation: 1
+  expose_prediction: false
+  data_preview: false
+  code:
+    model: gpt-4o-mini
+    temp: 0.7
+    thinking: ???
+    betas: ???
+    max_tokens: 8000
+  feedback:
+    model: gpt-4o-mini
+    temp: 0.5
+    thinking: ???
+    betas: ???
+    max_tokens: 4096
+  vlm_feedback:
+    model: gpt-4o-mini
+    temp: 0.5
+    thinking: ???
+    betas: ???
+    max_tokens: 4096
+  search:
+    max_debug_depth: 2
+    debug_prob: 0.3
+    num_drafts: 2
+  num_workers: 2
+  type: parallel
+  multi_seed_eval:
+    num_seeds: 2
+experiment:
+  num_syn_datasets: 1
+debug:
+  stage4: false

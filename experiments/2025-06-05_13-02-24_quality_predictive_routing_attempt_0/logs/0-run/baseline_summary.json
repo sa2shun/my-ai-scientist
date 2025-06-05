@@ -1,0 +1,70 @@
+{
+  "best node": {
+    "overall_plan": "The overall plan initially focused on implementing a preliminary version of QualityRoute by creating a synthetic dataset to simulate query-response pairs. A simple linear regression model was used to predict output quality based on input features, with a focus on simulating processing time for each query to understand the quality-speed trade-off. The training aimed to minimize loss while tracking the quality-speed trade-off score during validation. Evaluation metrics and predictions were saved for further analysis. Building on this, the current plan involves hyperparameter tuning for the weight decay parameter, modifying the optimizer to include weight decay and testing multiple values. Training and validation losses for each configuration will be recorded to evaluate the model's performance, with results saved using a specified naming convention. This progression from foundational implementation to targeted optimization highlights a comprehensive approach to enhancing model performance and understanding its quality-speed trade-off.",
+    "analysis": "",
+    "metric": {
+      "value": {
+        "metric_names": [
+          {
+            "metric_name": "final training loss",
+            "lower_is_better": true,
+            "description": "The final training loss achieved during the training process.",
+            "data": [
+              {
+                "dataset_name": "query_response_dataset",
+                "final_value": 0.0097,
+                "best_value": 0.0097
+              }
+            ]
+          },
+          {
+            "metric_name": "final validation loss",
+            "lower_is_better": true,
+            "description": "The final validation loss achieved on the validation dataset.",
+            "data": [
+              {
+                "dataset_name": "query_response_dataset",
+                "final_value": 0.0082,
+                "best_value": 0.0082
+              }
+            ]
+          },
+          {
+            "metric_name": "final validation quality-speed tradeoff",
+            "lower_is_better": false,
+            "description": "The final quality-speed tradeoff metric achieved on the validation dataset.",
+            "data": [
+              {
+                "dataset_name": "query_response_dataset",
+                "final_value": 1.0434,
+                "best_value": 1.0434
+              }
+            ]
+          }
+        ]
+      },
+      "maximize": null,
+      "name": null,
+      "description": null
+    },
+    "code": "import os\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import DataLoader, Dataset, random_split\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n\n# Synthetic dataset generation\nclass QueryResponseDataset(Dataset):\n    def __init__(self, num_samples=1000):\n        self.features = np.random.rand(num_samples, 5)  # 5 features\n        self.quality = np.dot(\n            self.features, np.array([0.3, 0.2, 0.5, 0.1, 0.4])\n        ) + np.random.normal(0, 0.1, num_samples)\n        self.processing_time = (\n            np.random.rand(num_samples) * 0.5 + 0.5\n        )  # Simulated processing time between 0.5 and 1.0 seconds\n\n    def __len__(self):\n        return len(self.features)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": torch.tensor(self.features[idx], dtype=torch.float32),\n            \"quality\": torch.tensor(self.quality[idx], dtype=torch.float32),\n            \"processing_time\": torch.tensor(\n                self.processing_time[idx], dtype=torch.float32\n            ),\n        }\n\n\n# Model definition\nclass QualityPredictor(nn.Module):\n    def __init__(self):\n        super(QualityPredictor, self).__init__()\n        self.linear = nn.Linear(5, 1)\n\n    def forward(self, x):\n        return self.linear(x)\n\n\n# Training and evaluation\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\ndataset = QueryResponseDataset()\ntrain_size = int(0.8 * len(dataset))\nval_size = len(dataset) - train_size\ntrain_dataset, val_dataset = random_split(dataset, [train_size, val_size])\ntrain_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)\nval_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)\n\nweight_decays = [0.0, 0.01, 0.001, 0.0001]  # Different weight decay values\nexperiment_data = {\n    \"weight_decay_tuning\": {\n        \"query_response_dataset\": {\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        },\n    },\n}\n\nfor wd in weight_decays:\n    model = QualityPredictor().to(device)\n    criterion = nn.MSELoss()\n    optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=wd)\n\n    for epoch in range(50):\n        model.train()\n        total_loss = 0\n        for batch in train_loader:\n            features = batch[\"features\"].to(device)\n            quality = batch[\"quality\"].to(device)\n            optimizer.zero_grad()\n            outputs = model(features)\n            loss = criterion(outputs.squeeze(), quality)\n            loss.backward()\n            optimizer.step()\n            total_loss += loss.item()\n\n        avg_train_loss = total_loss / len(train_loader)\n        experiment_data[\"weight_decay_tuning\"][\"query_response_dataset\"][\"losses\"][\n            \"train\"\n        ].append(avg_train_loss)\n\n        # Validation phase\n        model.eval()\n        val_loss = 0\n        total_quality = 0\n        total_processing_time = 0\n        with torch.no_grad():\n            for batch in val_loader:\n                features = batch[\"features\"].to(device)\n                quality = batch[\"quality\"].to(device)\n                processing_time = batch[\"processing_time\"].to(device)\n                outputs = model(features)\n                val_loss += criterion(outputs.squeeze(), quality).item()\n                total_quality += outputs.sum().item()\n                total_processing_time += processing_time.sum().item()\n\n        avg_val_loss = val_loss / len(val_loader)\n        experiment_data[\"weight_decay_tuning\"][\"query_response_dataset\"][\"losses\"][\n            \"val\"\n        ].append(avg_val_loss)\n        quality_speed_tradeoff = (\n            total_quality / total_processing_time\n        )  # Simplified metric\n        experiment_data[\"weight_decay_tuning\"][\"query_response_dataset\"][\"metrics\"][\n            \"val\"\n        ].append(quality_speed_tradeoff)\n\n        print(\n            f\"Weight Decay {wd}: Epoch {epoch+1}: train_loss = {avg_train_loss:.4f}, validation_loss = {avg_val_loss:.4f}, quality_speed_tradeoff = {quality_speed_tradeoff:.4f}\"\n        )\n\n# Saving experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n",
+    "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n\nweight_decays = list(\n    experiment_data[\"weight_decay_tuning\"][\"query_response_dataset\"][\"losses\"][\"train\"]\n)\ntrain_losses = experiment_data[\"weight_decay_tuning\"][\"query_response_dataset\"][\n    \"losses\"\n][\"train\"]\nval_losses = experiment_data[\"weight_decay_tuning\"][\"query_response_dataset\"][\"losses\"][\n    \"val\"\n]\nmetrics = experiment_data[\"weight_decay_tuning\"][\"query_response_dataset\"][\"metrics\"][\n    \"val\"\n]\n\ntry:\n    plt.figure()\n    plt.plot(range(1, len(train_losses) + 1), train_losses, label=\"Training Loss\")\n    plt.plot(range(1, len(val_losses) + 1), val_losses, label=\"Validation Loss\")\n    plt.title(\"Loss Curves: Query Response Dataset\")\n    plt.xlabel(\"Epochs\")\n    plt.ylabel(\"Loss\")\n    plt.legend()\n    plt.savefig(os.path.join(working_dir, \"query_response_dataset_loss_curves.png\"))\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating loss curves plot: {e}\")\n    plt.close()\n\ntry:\n    plt.figure()\n    plt.bar(range(len(weight_decays)), metrics)\n    plt.xticks(range(len(weight_decays)), weight_decays)\n    plt.title(\"Quality-Speed Tradeoff: Query Response Dataset\")\n    plt.xlabel(\"Weight Decay\")\n    plt.ylabel(\"Quality-Speed Tradeoff\")\n    plt.savefig(\n        os.path.join(working_dir, \"query_response_dataset_quality_speed_tradeoff.png\")\n    )\n    plt.close()\nexcept Exception as e:\n    print(f\"Error creating quality-speed tradeoff plot: {e}\")\n    plt.close()\n",
+    "plot_plan": "To visualize the results from the experiment data, I will load the data from `experiment_data.npy` and create plots for the training and validation losses over epochs. I will also plot the quality-speed tradeoff metric for each weight decay value. Each plot will be generated in its own try-except block to handle potential errors during plotting. The figures will be saved in the `working_dir` with descriptive filenames indicating the dataset used and the type of metric being visualized. I will ensure that each plot includes a title and will close the figures after saving them.",
+    "plot_analyses": [
+      {
+        "analysis": "The quality-speed tradeoff plot shows a relatively uniform distribution of quality-speed tradeoff values across various weight decay settings. However, the presence of spikes indicates that certain configurations may yield better performance, though no clear optimal weight decay value emerges from the data. This suggests that while the model can achieve reasonable quality-speed tradeoffs, further exploration of hyperparameter tuning, especially around weight decay, is necessary to enhance performance.",
+        "plot_path": "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_ff2fb2732d5b42d3ba84e690748204a8_proc_3634790/query_response_dataset_loss_curves.png"
+      }
+    ],
+    "plot_paths": [
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_ff2fb2732d5b42d3ba84e690748204a8_proc_3634790/query_response_dataset_loss_curves.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_ff2fb2732d5b42d3ba84e690748204a8_proc_3634790/query_response_dataset_quality_speed_tradeoff.png"
+    ],
+    "vlm_feedback_summary": "Two plots were analyzed: 1) Loss curves indicating potential overfitting and instability, and 2) Quality-speed tradeoff showing uniform performance with spikes suggesting areas for improvement.",
+    "exp_results_dir": "experiment_results/experiment_ff2fb2732d5b42d3ba84e690748204a8_proc_3634790",
+    "exp_results_npy_files": [
+      "experiment_results/experiment_ff2fb2732d5b42d3ba84e690748204a8_proc_3634790/experiment_data.npy"
+    ]
+  },
+  "best node with different seeds": []
+}

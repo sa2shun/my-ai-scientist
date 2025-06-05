@@ -1,0 +1,208 @@
+[
+  {
+    "overall_plan": "The overall plan involves a dual focus on optimization hyperparameter tuning and dataset diversity ablation. Initially, the plan is to implement hyperparameter tuning for the momentum parameter in the optimization process by iterating over a range of momentum values, using SGD with momentum, and recording relevant performance metrics. The objective is to analyze the impact of different momentum settings on model performance. Complementing this, the current plan introduces an ablation study on dataset diversity by creating synthetic datasets with varying distributions and feature-quality relationships. This involves training and evaluating the model on datasets with both linear and non-linear relationships to assess robustness and adaptability to diverse data scenarios. Together, these efforts aim to optimize learning dynamics and enhance model generalization across varying data conditions.",
+    "analysis": "",
+    "metric": {
+      "value": {
+        "metric_names": [
+          {
+            "metric_name": "final training loss",
+            "lower_is_better": true,
+            "description": "The final training loss after training.",
+            "data": [
+              {
+                "dataset_name": "linear",
+                "final_value": 0.0097,
+                "best_value": 0.0097
+              },
+              {
+                "dataset_name": "nonlinear",
+                "final_value": 0.5034,
+                "best_value": 0.5034
+              },
+              {
+                "dataset_name": "original",
+                "final_value": 0.0096,
+                "best_value": 0.0096
+              }
+            ]
+          },
+          {
+            "metric_name": "final validation loss",
+            "lower_is_better": true,
+            "description": "The final validation loss after training.",
+            "data": [
+              {
+                "dataset_name": "linear",
+                "final_value": 0.0082,
+                "best_value": 0.0082
+              },
+              {
+                "dataset_name": "nonlinear",
+                "final_value": 0.51,
+                "best_value": 0.51
+              },
+              {
+                "dataset_name": "original",
+                "final_value": 0.0113,
+                "best_value": 0.0113
+              }
+            ]
+          },
+          {
+            "metric_name": "final quality-speed tradeoff",
+            "lower_is_better": false,
+            "description": "The final quality-speed tradeoff after training.",
+            "data": [
+              {
+                "dataset_name": "linear",
+                "final_value": 1.0599,
+                "best_value": 1.0599
+              },
+              {
+                "dataset_name": "nonlinear",
+                "final_value": 0.1141,
+                "best_value": 0.1141
+              },
+              {
+                "dataset_name": "original",
+                "final_value": 1.0039,
+                "best_value": 1.0039
+              }
+            ]
+          }
+        ]
+      },
+      "maximize": null,
+      "name": null,
+      "description": null
+    },
+    "code": "import os\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import DataLoader, Dataset, random_split\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n\n# Synthetic dataset generation\nclass QueryResponseDataset(Dataset):\n    def __init__(self, num_samples=1000, dataset_type=\"linear\"):\n        self.features = np.random.rand(num_samples, 5)  # 5 features\n        if dataset_type == \"linear\":\n            self.quality = np.dot(\n                self.features, np.array([0.3, 0.2, 0.5, 0.1, 0.4])\n            ) + np.random.normal(0, 0.1, num_samples)\n        elif dataset_type == \"nonlinear\":\n            self.quality = np.sin(\n                np.dot(self.features, np.array([1, 2, 3, 4, 5]))\n            ) + np.random.normal(0, 0.1, num_samples)\n        self.processing_time = (\n            np.random.rand(num_samples) * 0.5 + 0.5\n        )  # Simulated processing time between 0.5 and 1.0 seconds\n\n    def __len__(self):\n        return len(self.features)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": torch.tensor(self.features[idx], dtype=torch.float32),\n            \"quality\": torch.tensor(self.quality[idx], dtype=torch.float32),\n            \"processing_time\": torch.tensor(\n                self.processing_time[idx], dtype=torch.float32\n            ),\n        }\n\n\n# Model definition\nclass QualityPredictor(nn.Module):\n    def __init__(self):\n        super(QualityPredictor, self).__init__()\n        self.linear = nn.Linear(5, 1)\n\n    def forward(self, x):\n        return self.linear(x)\n\n\n# Training and evaluation\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\ndatasets = {\n    \"linear\": QueryResponseDataset(dataset_type=\"linear\"),\n    \"nonlinear\": QueryResponseDataset(dataset_type=\"nonlinear\"),\n    \"original\": QueryResponseDataset(dataset_type=\"linear\"),  # Original dataset\n}\n\nexperiment_data = {\n    \"dataset_diversity_ablation\": {\n        \"linear\": {\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        },\n        \"nonlinear\": {\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        },\n        \"original\": {\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        },\n    }\n}\n\nmomentum_values = [0.0, 0.5, 0.9]  # Hyperparameter tuning for momentum\n\nfor dataset_name, dataset in datasets.items():\n    train_size = int(0.8 * len(dataset))\n    val_size = len(dataset) - train_size\n    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])\n    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)\n    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)\n\n    for momentum in momentum_values:\n        model = QualityPredictor().to(device)\n        criterion = nn.MSELoss()\n        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=momentum)\n\n        for epoch in range(50):\n            model.train()\n            total_loss = 0\n            for batch in train_loader:\n                features = batch[\"features\"].to(device)\n                quality = batch[\"quality\"].to(device)\n                optimizer.zero_grad()\n                outputs = model(features)\n                loss = criterion(outputs.squeeze(), quality)\n                loss.backward()\n                optimizer.step()\n                total_loss += loss.item()\n\n            avg_train_loss = total_loss / len(train_loader)\n            experiment_data[\"dataset_diversity_ablation\"][dataset_name][\"losses\"][\n                \"train\"\n            ].append(avg_train_loss)\n\n            # Validation phase\n            model.eval()\n            val_loss = 0\n            total_quality = 0\n            total_processing_time = 0\n            with torch.no_grad():\n                for batch in val_loader:\n                    features = batch[\"features\"].to(device)\n                    quality = batch[\"quality\"].to(device)\n                    processing_time = batch[\"processing_time\"].to(device)\n                    outputs = model(features)\n                    val_loss += criterion(outputs.squeeze(), quality).item()\n                    total_quality += outputs.sum().item()\n                    total_processing_time += processing_time.sum().item()\n\n            avg_val_loss = val_loss / len(val_loader)\n            experiment_data[\"dataset_diversity_ablation\"][dataset_name][\"losses\"][\n                \"val\"\n            ].append(avg_val_loss)\n            quality_speed_tradeoff = (\n                total_quality / total_processing_time\n            )  # Simplified metric\n            experiment_data[\"dataset_diversity_ablation\"][dataset_name][\"metrics\"][\n                \"val\"\n            ].append(quality_speed_tradeoff)\n\n            print(\n                f\"[{dataset_name}] Momentum {momentum}, Epoch {epoch+1}: train_loss = {avg_train_loss:.4f}, validation_loss = {avg_val_loss:.4f}, quality_speed_tradeoff = {quality_speed_tradeoff:.4f}\"\n            )\n\n# Saving experiment data\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n",
+    "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\ntry:\n    experiment_data = np.load(\n        os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n    ).item()\nexcept Exception as e:\n    print(f\"Error loading experiment data: {e}\")\n\n# Plotting training and validation losses\nfor dataset_name in [\"linear\", \"nonlinear\"]:\n    try:\n        plt.figure()\n        epochs = range(\n            1,\n            len(\n                experiment_data[\"dataset_diversity_ablation\"][dataset_name][\"losses\"][\n                    \"train\"\n                ]\n            )\n            + 1,\n        )\n        plt.plot(\n            epochs,\n            experiment_data[\"dataset_diversity_ablation\"][dataset_name][\"losses\"][\n                \"train\"\n            ],\n            label=\"Train Loss\",\n        )\n        plt.plot(\n            epochs,\n            experiment_data[\"dataset_diversity_ablation\"][dataset_name][\"losses\"][\n                \"val\"\n            ],\n            label=\"Validation Loss\",\n        )\n        plt.title(f\"{dataset_name.capitalize()} Dataset Loss Curves\")\n        plt.xlabel(\"Epochs\")\n        plt.ylabel(\"Loss\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, f\"{dataset_name}_loss_curves.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating plot for {dataset_name} losses: {e}\")\n        plt.close()\n\n    try:\n        plt.figure()\n        metrics = experiment_data[\"dataset_diversity_ablation\"][dataset_name][\n            \"metrics\"\n        ][\"val\"]\n        plt.plot(epochs, metrics, label=\"Quality-Speed Tradeoff\")\n        plt.title(f\"{dataset_name.capitalize()} Dataset Quality-Speed Tradeoff\")\n        plt.xlabel(\"Epochs\")\n        plt.ylabel(\"Quality-Speed Metric\")\n        plt.legend()\n        plt.savefig(\n            os.path.join(working_dir, f\"{dataset_name}_quality_speed_tradeoff.png\")\n        )\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating plot for {dataset_name} metrics: {e}\")\n        plt.close()\n",
+    "plot_plan": "To visualize the results from the experiment stored in `experiment_data.npy`, I will load the data and create plots for training and validation losses for both linear and nonlinear datasets. Each plot will have a title and will clearly specify the dataset type. Given that there are multiple epochs, I will select only five representative epochs for clarity. I will save each plot in the `working_dir` and ensure that all figures are closed after saving to prevent memory issues. Error handling will be implemented for each plot to catch any issues during the plotting process.",
+    "plot_analyses": [
+      {
+        "analysis": "The quality-speed tradeoff metric for the linear dataset shows a relatively stable performance with minor fluctuations throughout the training epochs. The metric hovers around 1.0, indicating a balanced tradeoff between quality and speed. However, the slight dips at certain epochs suggest that there may be specific points where the balance is disrupted, warranting further investigation into those epochs for potential improvements.",
+        "plot_path": "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759/linear_loss_curves.png"
+      },
+      {
+        "analysis": "The quality-speed tradeoff metric for the nonlinear dataset shows more variability compared to the linear dataset. The values oscillate, with some periods of negative values indicating that the tradeoff may not be favorable during those epochs. This suggests that the model may not be effectively balancing quality and speed, highlighting a potential area for improvement in the routing mechanism.",
+        "plot_path": "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759/linear_quality_speed_tradeoff.png"
+      }
+    ],
+    "plot_paths": [
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759/linear_loss_curves.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759/linear_quality_speed_tradeoff.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759/nonlinear_loss_curves.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759/nonlinear_quality_speed_tradeoff.png"
+    ],
+    "vlm_feedback_summary": "The analysis covers the loss curves and quality-speed tradeoff metrics for both linear and nonlinear datasets, noting trends, instabilities, and implications for model performance.",
+    "exp_results_dir": "experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759",
+    "ablation_name": "Dataset Diversity Ablation",
+    "exp_results_npy_files": [
+      "experiment_results/experiment_565ead2cb98440cda6984ae814c1ba4e_proc_3651759/experiment_data.npy"
+    ]
+  },
+  {
+    "overall_plan": "The overall plan involves two key components: optimizing the model's training process through hyperparameter tuning of the momentum parameter in SGD, and evaluating the model's robustness and generalization through an ablation study using multiple synthetic datasets. The hyperparameter tuning aims to find the optimal momentum value to enhance training efficiency and performance, while the ablation study tests the model's adaptability across datasets with varying feature correlations and noise levels. This comprehensive approach aims to refine the model's performance and robustness in diverse conditions.",
+    "analysis": "",
+    "metric": {
+      "value": {
+        "metric_names": [
+          {
+            "metric_name": "final training loss",
+            "lower_is_better": true,
+            "description": "The final training loss value for the model.",
+            "data": [
+              {
+                "dataset_name": "dataset_1",
+                "final_value": 0.009667057525366545,
+                "best_value": 0.009667057525366545
+              },
+              {
+                "dataset_name": "dataset_2",
+                "final_value": 0.2550427323579788,
+                "best_value": 0.2550427323579788
+              },
+              {
+                "dataset_name": "dataset_3",
+                "final_value": 0.03830083981156349,
+                "best_value": 0.03830083981156349
+              }
+            ]
+          },
+          {
+            "metric_name": "final validation loss",
+            "lower_is_better": true,
+            "description": "The final validation loss value for the model.",
+            "data": [
+              {
+                "dataset_name": "dataset_1",
+                "final_value": 0.00823523396892207,
+                "best_value": 0.00823523396892207
+              },
+              {
+                "dataset_name": "dataset_2",
+                "final_value": 0.20898823227201188,
+                "best_value": 0.20898823227201188
+              },
+              {
+                "dataset_name": "dataset_3",
+                "final_value": 0.04507835954427719,
+                "best_value": 0.04507835954427719
+              }
+            ]
+          },
+          {
+            "metric_name": "final quality-speed tradeoff",
+            "lower_is_better": false,
+            "description": "The final quality-speed tradeoff value for the model.",
+            "data": [
+              {
+                "dataset_name": "dataset_1",
+                "final_value": 1.0599400565752743,
+                "best_value": 1.0599400565752743
+              },
+              {
+                "dataset_name": "dataset_2",
+                "final_value": 0.5437293789314758,
+                "best_value": 0.5437293789314758
+              },
+              {
+                "dataset_name": "dataset_3",
+                "final_value": 0.30698167005969645,
+                "best_value": 0.30698167005969645
+              }
+            ]
+          }
+        ]
+      },
+      "maximize": null,
+      "name": null,
+      "description": null
+    },
+    "code": "import os\nimport numpy as np\nimport torch\nimport torch.nn as nn\nimport torch.optim as optim\nfrom torch.utils.data import DataLoader, Dataset, random_split\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nos.makedirs(working_dir, exist_ok=True)\n\n\nclass QueryResponseDataset(Dataset):\n    def __init__(self, num_samples=1000, noise_level=0.1, correlation=0.5):\n        self.features = np.random.rand(num_samples, 5)  # 5 features\n        self.quality = np.dot(\n            self.features, np.array([0.3, 0.2, 0.5, 0.1, 0.4]) * correlation\n        ) + np.random.normal(0, noise_level, num_samples)\n        self.processing_time = (\n            np.random.rand(num_samples) * 0.5 + 0.5\n        )  # Simulated processing time between 0.5 and 1.0 seconds\n\n    def __len__(self):\n        return len(self.features)\n\n    def __getitem__(self, idx):\n        return {\n            \"features\": torch.tensor(self.features[idx], dtype=torch.float32),\n            \"quality\": torch.tensor(self.quality[idx], dtype=torch.float32),\n            \"processing_time\": torch.tensor(\n                self.processing_time[idx], dtype=torch.float32\n            ),\n        }\n\n\nclass QualityPredictor(nn.Module):\n    def __init__(self):\n        super(QualityPredictor, self).__init__()\n        self.linear = nn.Linear(5, 1)\n\n    def forward(self, x):\n        return self.linear(x)\n\n\ndevice = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\nprint(f\"Using device: {device}\")\n\ndatasets = {\n    \"dataset_1\": QueryResponseDataset(\n        num_samples=1000, noise_level=0.1, correlation=1.0\n    ),\n    \"dataset_2\": QueryResponseDataset(\n        num_samples=1000, noise_level=0.5, correlation=0.5\n    ),\n    \"dataset_3\": QueryResponseDataset(\n        num_samples=1000, noise_level=0.2, correlation=0.3\n    ),\n}\n\nexperiment_data = {\n    \"multiple_dataset_evaluation\": {\n        dataset_name: {\n            \"metrics\": {\"train\": [], \"val\": []},\n            \"losses\": {\"train\": [], \"val\": []},\n            \"predictions\": [],\n            \"ground_truth\": [],\n        }\n        for dataset_name in datasets.keys()\n    }\n}\n\nmomentum_values = [0.0, 0.5, 0.9]\n\nfor dataset_name, dataset in datasets.items():\n    train_size = int(0.8 * len(dataset))\n    val_size = len(dataset) - train_size\n    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])\n    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)\n    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)\n\n    for momentum in momentum_values:\n        model = QualityPredictor().to(device)\n        criterion = nn.MSELoss()\n        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=momentum)\n\n        for epoch in range(50):\n            model.train()\n            total_loss = 0\n            for batch in train_loader:\n                features = batch[\"features\"].to(device)\n                quality = batch[\"quality\"].to(device)\n                optimizer.zero_grad()\n                outputs = model(features)\n                loss = criterion(outputs.squeeze(), quality)\n                loss.backward()\n                optimizer.step()\n                total_loss += loss.item()\n\n            avg_train_loss = total_loss / len(train_loader)\n            experiment_data[\"multiple_dataset_evaluation\"][dataset_name][\"losses\"][\n                \"train\"\n            ].append(avg_train_loss)\n\n            model.eval()\n            val_loss = 0\n            total_quality = 0\n            total_processing_time = 0\n            with torch.no_grad():\n                for batch in val_loader:\n                    features = batch[\"features\"].to(device)\n                    quality = batch[\"quality\"].to(device)\n                    processing_time = batch[\"processing_time\"].to(device)\n                    outputs = model(features)\n                    val_loss += criterion(outputs.squeeze(), quality).item()\n                    total_quality += outputs.sum().item()\n                    total_processing_time += processing_time.sum().item()\n\n            avg_val_loss = val_loss / len(val_loader)\n            experiment_data[\"multiple_dataset_evaluation\"][dataset_name][\"losses\"][\n                \"val\"\n            ].append(avg_val_loss)\n            quality_speed_tradeoff = total_quality / total_processing_time\n            experiment_data[\"multiple_dataset_evaluation\"][dataset_name][\"metrics\"][\n                \"val\"\n            ].append(quality_speed_tradeoff)\n\n            print(\n                f\"Dataset {dataset_name}, Momentum {momentum}, Epoch {epoch+1}: train_loss = {avg_train_loss:.4f}, validation_loss = {avg_val_loss:.4f}, quality_speed_tradeoff = {quality_speed_tradeoff:.4f}\"\n            )\n\nnp.save(os.path.join(working_dir, \"experiment_data.npy\"), experiment_data)\n",
+    "plot_code": "import matplotlib.pyplot as plt\nimport numpy as np\nimport os\n\nworking_dir = os.path.join(os.getcwd(), \"working\")\nexperiment_data = np.load(\n    os.path.join(working_dir, \"experiment_data.npy\"), allow_pickle=True\n).item()\n\nfor dataset_name in experiment_data[\"multiple_dataset_evaluation\"]:\n    try:\n        train_losses = experiment_data[\"multiple_dataset_evaluation\"][dataset_name][\n            \"losses\"\n        ][\"train\"]\n        val_losses = experiment_data[\"multiple_dataset_evaluation\"][dataset_name][\n            \"losses\"\n        ][\"val\"]\n        epochs = range(1, len(train_losses) + 1)\n\n        plt.figure()\n        plt.plot(epochs, train_losses, label=\"Training Loss\")\n        plt.plot(epochs, val_losses, label=\"Validation Loss\")\n        plt.title(f\"{dataset_name} Loss Curves\")\n        plt.xlabel(\"Epochs\")\n        plt.ylabel(\"Loss\")\n        plt.legend()\n        plt.savefig(os.path.join(working_dir, f\"{dataset_name}_loss_curves.png\"))\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating plot for {dataset_name} loss curves: {e}\")\n        plt.close()\n\n    try:\n        quality_metrics = experiment_data[\"multiple_dataset_evaluation\"][dataset_name][\n            \"metrics\"\n        ][\"val\"]\n        plt.figure()\n        plt.plot(\n            range(1, len(quality_metrics) + 1),\n            quality_metrics,\n            label=\"Quality-Speed Tradeoff\",\n        )\n        plt.title(f\"{dataset_name} Quality-Speed Tradeoff\")\n        plt.xlabel(\"Epochs\")\n        plt.ylabel(\"Tradeoff Metric\")\n        plt.legend()\n        plt.savefig(\n            os.path.join(working_dir, f\"{dataset_name}_quality_speed_tradeoff.png\")\n        )\n        plt.close()\n    except Exception as e:\n        print(f\"Error creating plot for {dataset_name} quality-speed tradeoff: {e}\")\n        plt.close()\n",
+    "plot_plan": "To visualize the experiment results, I will first load the data from the `experiment_data.npy` file. I will create standard plots, including training and validation loss curves for each dataset. Each plot will have a clear title, and I will save the figures in the `working_dir` with descriptive names. I will ensure that I plot only the necessary data, and for the loss curves, I will select only a suitable number of epochs to avoid cluttering the visuals. Each plot will be wrapped in a try-except block to handle any potential errors gracefully, and I will make sure to close each figure after saving to free up memory.",
+    "plot_analyses": [
+      {
+        "analysis": "The quality-speed tradeoff metric for dataset_3 shows a clear downward trend initially, followed by stabilization around the 0.3 mark. This indicates that while the model is achieving a reasonable balance between quality and speed, there may be room for improvement in optimizing this tradeoff further.",
+        "plot_path": "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/dataset_1_loss_curves.png"
+      }
+    ],
+    "plot_paths": [
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/dataset_1_loss_curves.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/dataset_1_quality_speed_tradeoff.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/dataset_2_loss_curves.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/dataset_2_quality_speed_tradeoff.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/dataset_3_loss_curves.png",
+      "experiments/2025-06-05_13-02-24_quality_predictive_routing_attempt_0/logs/0-run/experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/dataset_3_quality_speed_tradeoff.png"
+    ],
+    "vlm_feedback_summary": "The plots indicate varying stability in loss curves and quality-speed tradeoff metrics across different datasets, suggesting areas for improvement in model training and evaluation.",
+    "exp_results_dir": "experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760",
+    "ablation_name": "Multiple Dataset Evaluation Ablation",
+    "exp_results_npy_files": [
+      "experiment_results/experiment_12eae2e5710c4d299a181d9cef49c4b6_proc_3651760/experiment_data.npy"
+    ]
+  }
+]

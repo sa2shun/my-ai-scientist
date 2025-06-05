@@ -1,0 +1,51 @@
+agent:
+  code:
+    max_tokens: 8000
+    model: claude-3-5-sonnet-20241022
+    temp: 0.7
+  data_preview: false
+  expose_prediction: false
+  feedback:
+    max_tokens: 4096
+    model: claude-3-5-sonnet-20241022
+    temp: 0.5
+  k_fold_validation: 1
+  multi_seed_eval:
+    num_seeds: 2
+  num_workers: 2
+  search:
+    debug_prob: 0.3
+    max_debug_depth: 2
+    num_drafts: 2
+  stages:
+    stage1_max_iters: 8
+    stage2_max_iters: 6
+    stage3_max_iters: 6
+    stage4_max_iters: 8
+  steps: 3
+  type: parallel
+  vlm_feedback:
+    max_tokens: 4096
+    model: claude-3-5-sonnet-20241022
+    temp: 0.5
+copy_data: true
+data_dir: experiments/2025-06-05_11-54-37_speculative_hallucination_detection_attempt_0/data
+debug:
+  stage4: false
+desc_file: experiments/2025-06-05_11-54-37_speculative_hallucination_detection_attempt_0/idea.json
+eval: null
+exec:
+  agent_file_name: runfile.py
+  format_tb_ipython: false
+  timeout: 3600
+exp_name: run
+experiment:
+  num_syn_datasets: 1
+generate_report: true
+goal: null
+log_dir: experiments/2025-06-05_11-54-37_speculative_hallucination_detection_attempt_0/logs
+preprocess_data: false
+report:
+  model: claude-3-5-sonnet-20241022
+  temp: 0.7
+workspace_dir: experiments/2025-06-05_11-54-37_speculative_hallucination_detection_attempt_0
