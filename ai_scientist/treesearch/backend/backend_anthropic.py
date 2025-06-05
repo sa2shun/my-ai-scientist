@@ -5,8 +5,8 @@ from .utils import FunctionSpec, OutputType, opt_messages_to_list, backoff_creat
 from funcy import notnone, once, select_values
 import anthropic
 
-# _client: anthropic.Anthropic = None  # type: ignore
-_client: anthropic.AnthropicBedrock = None  # type: ignore
+_client: anthropic.Anthropic = None  # type: ignore
+# _client: anthropic.AnthropicBedrock = None  # type: ignore
 
 ANTHROPIC_TIMEOUT_EXCEPTIONS = (
     anthropic.RateLimitError,
@@ -20,8 +20,8 @@ ANTHROPIC_TIMEOUT_EXCEPTIONS = (
 @once
 def _setup_anthropic_client():
     global _client
-    # _client = anthropic.Anthropic(max_retries=0)
-    _client = anthropic.AnthropicBedrock(max_retries=0)
+    _client = anthropic.Anthropic(max_retries=0)
+    # _client = anthropic.AnthropicBedrock(max_retries=0)
 
 
 def query(
@@ -37,9 +37,9 @@ def query(
         filtered_kwargs["max_tokens"] = 8192  # default for Claude models
 
     if func_spec is not None:
-        raise NotImplementedError(
-            "Anthropic does not support function calling for now."
-        )
+        # Anthropic supports tool use (function calling)
+        filtered_kwargs["tools"] = [func_spec.as_anthropic_tool_dict]
+        filtered_kwargs["tool_choice"] = {"type": "tool", "name": func_spec.name}
 
     # Anthropic doesn't allow not having a user messages
     # if we only have system msg -> use it as user msg
@@ -62,7 +62,24 @@ def query(
     req_time = time.time() - t0
     print(filtered_kwargs)
 
-    if "thinking" in filtered_kwargs:
+    # Handle different response types
+    if func_spec is not None:
+        # Function calling response
+        tool_use_block = None
+        for content_block in message.content:
+            if content_block.type == "tool_use":
+                tool_use_block = content_block
+                break
+        
+        if tool_use_block:
+            output = {
+                "name": tool_use_block.name,
+                "arguments": tool_use_block.input
+            }
+        else:
+            # Fallback to text if no tool use found
+            output: str = message.content[0].text if message.content else ""
+    elif "thinking" in filtered_kwargs:
         assert (
             len(message.content) == 2
             and message.content[0].type == "thinking"

@@ -21,10 +21,10 @@ exec:
   format_tb_ipython: False
 
 generate_report: True
-# LLM settings for final report from journal
+# LLM settings for final report from journal - Using GPT-4o-mini for consistency
 report:
-  model: gpt-4o-2024-11-20
-  temp: 1.0
+  model: gpt-4o-mini  # Use GPT-4o-mini for report consistency
+  temp: 0.7  # Reduced temperature for more focused output
 
 experiment:
   num_syn_datasets: 1
@@ -32,45 +32,44 @@ experiment:
 debug:
   stage4: False
 
-# agent hyperparams
+# agent hyperparams - COST-OPTIMIZED CONFIG
 agent:
   type: parallel
-  num_workers: 4
+  num_workers: 2  # Reduced from 4 to save on parallel API calls
   stages:
-    stage1_max_iters: 20
-    stage2_max_iters: 12
-    stage3_max_iters: 12
-    stage4_max_iters: 18
+    stage1_max_iters: 8   # Reduced from 20
+    stage2_max_iters: 6   # Reduced from 12  
+    stage3_max_iters: 6   # Reduced from 12
+    stage4_max_iters: 8   # Reduced from 18
   # how many improvement iterations to run
-  steps: 5 # if stage-specific max_iters are not provided, the agent will use this value for all stages
+  steps: 3 # Reduced from 5 to limit total steps
   # whether to instruct the agent to use CV (set to 1 to disable)
   k_fold_validation: 1
   multi_seed_eval:
-    num_seeds: 3 # should be the same as num_workers if num_workers < 3. Otherwise, set it to be 3.
+    num_seeds: 2 # Reduced from 3 to save on evaluation runs
   # whether to instruct the agent to generate a prediction function
   expose_prediction: False
   # whether to provide the agent with a preview of the data
   data_preview: False
 
-  # LLM settings for coding
+  # LLM settings for coding - using GPT-4o-mini (reliable function calling)
   code:
-    model: anthropic.claude-3-5-sonnet-20241022-v2:0
-    temp: 1.0
-    max_tokens: 12000
+    model: gpt-4o-mini  # Use GPT-4o-mini for reliable function calling
+    temp: 0.7  # Reduced from 1.0 for more focused responses
+    max_tokens: 8000  # Reduced from 12000
 
-  # LLM settings for evaluating program output / tracebacks
+  # LLM settings for evaluating program output / tracebacks  
   feedback:
-    model: gpt-4o-2024-11-20
-    # gpt-4o
+    model: gpt-4o-mini  # Use GPT-4o-mini for reliable function calling
     temp: 0.5
-    max_tokens: 8192
+    max_tokens: 4096  # Reduced from 8192
 
   vlm_feedback:
-    model: gpt-4o-2024-11-20
+    model: gpt-4o-mini  # Use GPT-4o-mini for reliable function calling
     temp: 0.5
-    max_tokens: null
+    max_tokens: 4096  # Set limit instead of null
 
   search:
-    max_debug_depth: 3
-    debug_prob: 0.5
-    num_drafts: 3
+    max_debug_depth: 2  # Reduced from 3
+    debug_prob: 0.3     # Reduced from 0.5
+    num_drafts: 2       # Reduced from 3
